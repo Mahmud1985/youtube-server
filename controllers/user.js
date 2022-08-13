@@ -1,5 +1,6 @@
 import { createError } from "../error.js"
 import User from "../models/User.js"
+import Video from "../models/Video.js"
 
 export const update = async (req, res, next) => {
 
@@ -48,18 +49,27 @@ export const subscribe = async (req, res, next) => {
         //req.user.id is the user loged in
         //req.params.id is the user subscribed by the login user
         //push subscribed user id to the login user subscribedUsers field.
-        await User.findByIdAndUpdate(req.user.id, {
-            $push: {
-                subscribedUsers: req.params.id
-            }
-        })
-        //increase the number of subscribers in be subscribed user.
-        await User.findByIdAndUpdate(req.params.id, {
-            $inc: {
-                subscribers: 1
-            }
-        })
-
+        if (req.user.id === req.params.id) {
+            return res.status(409).json("you can not subscribe yourself. :)")
+        }
+        const { subscribedUsers } = await User.findById(req.user.id)
+        const isSubscribedUser = subscribedUsers.includes(req.params.id)
+        if (isSubscribedUser) {
+            return res.status(409).json("You already subscribed this user/channel.")
+        }
+        else {
+            await User.findByIdAndUpdate(req.user.id, {
+                $addToSet: {
+                    subscribedUsers: req.params.id
+                }
+            })
+            //increase the number of subscribers in be subscribed user.
+            await User.findByIdAndUpdate(req.params.id, {
+                $inc: {
+                    subscribers: 1
+                }
+            })
+        }
         res.status(200).json("subscription successfull.")
     } catch (error) {
         next(error)
@@ -70,34 +80,56 @@ export const unsubscribe = async (req, res, next) => {
         //req.user.id is the user loged in
         //req.params.id is the user subscribed by the login user
         //pull subscribed user id from the login user subscribedUsers field.
-        await User.findByIdAndUpdate(req.user.id, {
-            $pull: {
-                subscribedUsers: req.params.id
-            }
-        })
-        //decrease the number of subscribers in be subscribed user.
-        await User.findByIdAndUpdate(req.params.id, {
-            $inc: {
-                subscribers: -1
-            }
-        })
-
-        res.status(200).json("Unsubscription successfull.")
+        if (req.user.id === req.params.id) {
+            return res.status(409).json("this is your user id . :)")
+        }
+        const { subscribedUsers } = await User.findById(req.user.id)
+        const isSubscribedUser = subscribedUsers.includes(req.params.id)
+        if (!isSubscribedUser) {
+            return res.status(404).json("You have not subscribed this user/channel.")
+        }
+        else {
+            await User.findByIdAndUpdate(req.user.id, {
+                $pull: {
+                    subscribedUsers: req.params.id
+                }
+            })
+            //decrease the number of subscribers in be subscribed user.
+            await User.findByIdAndUpdate(req.params.id, {
+                $inc: {
+                    subscribers: -1
+                }
+            })
+        }
+        res.status(200).json("unsubscription successfull.")
 
     } catch (error) {
         next(error)
     }
 }
 export const like = async (req, res, next) => {
-    try {
 
+    const id = req.user.id;
+    const videoId = req.params.videoId;
+    try {
+        await Video.findByIdAndUpdate(videoId, {
+            $addToSet: { likes: id },
+            $pull: { dislikes: id }
+        })
+        res.status(200).json("video has been liked.")
     } catch (error) {
         next(error)
     }
 }
 export const dislike = async (req, res, next) => {
+    const id = req.user.id;
+    const videoId = req.params.videoId;
     try {
-
+        await Video.findByIdAndUpdate(videoId, {
+            $addToSet: { dislikes: id },
+            $pull: { likes: id }
+        })
+        res.status(200).json("video has been disliked.")
     } catch (error) {
         next(error)
     }

@@ -12,6 +12,9 @@ router.put("/:id", verifyToken, updateVideo)
 //delete a video
 router.delete("/:id", verifyToken, deleteVideo)
 
+//get a video by id
+router.get("/find/:id", getVideo)
+
 //when view a video
 router.put("/view/:id", addView)
 
